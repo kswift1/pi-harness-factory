@@ -1,0 +1,53 @@
+{
+  "name": "pi-harness-factory",
+  "version": "0.1.0",
+  "description": "Create, switch, and manage persona-based harness profiles for Pi Coding Agent.",
+  "type": "module",
+  "author": "Sungwon Kim",
+  "homepage": "https://github.com/sungwon-kim/pi-harness-factory#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sungwon-kim/pi-harness-factory.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sungwon-kim/pi-harness-factory/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "coding-agent",
+    "harness",
+    "persona",
+    "factory"
+  ],
+  "license": "MIT",
+  "files": [
+    "README.md",
+    "extensions/",
+    "presets/",
+    "schemas/",
+    "templates/"
+  ],
+  "exports": {
+    "./extensions/index.ts": "./extensions/index.ts",
+    "./templates/*.json": "./templates/*.json"
+  },
+  "scripts": {
+    "test": "node -e \"require('node:fs').rmSync('.tmp-test', { recursive: true, force: true })\" && tsc --rootDir . --outDir .tmp-test && node tests/harness-factory.test.mjs"
+  },
+  "pi": {
+    "extensions": [
+      "extensions/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "latest",
+    "@types/node": "latest",
+    "typebox": "latest",
+    "typescript": "latest"
+  }
+}

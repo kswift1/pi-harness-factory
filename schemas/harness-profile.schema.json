@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pi Harness Factory Profile",
+  "type": "object",
+  "required": ["id", "displayName", "description", "persona", "tools", "guards", "workflow", "ui", "memory"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "displayName": { "type": "string" },
+    "description": { "type": "string" },
+    "persona": { "type": "string" },
+    "type": { "type": "string" },
+    "policies": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "boolean"] }
+    },
+    "packages": {
+      "type": "object",
+      "required": ["recommended", "allowed", "installCommands"],
+      "properties": {
+        "recommended": { "type": "array", "items": { "type": "string" } },
+        "allowed": { "type": "array", "items": { "type": "string" } },
+        "installCommands": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["enabled", "provider"],
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "provider": { "type": "string" }
+        }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "required": ["allowed", "blocked", "readOnly"],
+      "properties": {
+        "allowed": { "type": "array", "items": { "type": "string" } },
+        "blocked": { "type": "array", "items": { "type": "string" } },
+        "readOnly": { "type": "boolean" }
+      }
+    },
+    "guards": {
+      "type": "object",
+      "properties": {
+        "confirmDangerousCommands": { "type": "boolean" },
+        "blockSecrets": { "type": "boolean" },
+        "protectEnvFiles": { "type": "boolean" },
+        "confirmGitPush": { "type": "boolean" },
+        "confirmDeletes": { "type": "boolean" }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "properties": {
+        "requirePlanBeforeEdit": { "type": "boolean" },
+        "runTestsAfterEdit": { "type": "boolean" },
+        "summarizeChanges": { "type": "boolean" }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "required": ["statusLabel"],
+      "properties": {
+        "statusLabel": { "type": "string" },
+        "themeHint": { "type": "string" }
+      }
+    },
+    "memory": { "type": "array", "items": { "type": "string" } }
+  }
+}

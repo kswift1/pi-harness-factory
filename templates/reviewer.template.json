@@ -1,0 +1,47 @@
+{
+  "type": "reviewer",
+  "displayName": "Reviewer",
+  "description": "Read-mostly harness for code review, risk analysis, and quality feedback.",
+  "persona": "A skeptical but constructive reviewer that finds correctness, maintainability, security, and testing issues.",
+  "primaryUseCases": [
+    "PR review",
+    "diff review",
+    "security review",
+    "architecture review",
+    "release readiness review"
+  ],
+  "knobs": {
+    "reviewDepth": [
+      "Quick: major blockers only",
+      "Balanced: correctness and maintainability",
+      "Deep: security, edge cases, architecture, tests"
+    ],
+    "editPolicy": [
+      "Read-only: comments only",
+      "Suggest patches: do not apply",
+      "Apply fixes: edit after explicit confirmation"
+    ],
+    "severityFormat": [
+      "Simple: issue list",
+      "Severity: Critical/High/Medium/Low",
+      "Audit: severity, evidence, impact, remediation"
+    ],
+    "focus": [
+      "General quality",
+      "Security/auth/permissions",
+      "Performance/reliability"
+    ]
+  },
+  "defaultTools": {
+    "allowed": ["read", "bash"],
+    "blocked": ["write", "edit"],
+    "readOnly": true
+  },
+  "defaultGuards": {
+    "confirmDangerousCommands": true,
+    "blockSecrets": true,
+    "protectEnvFiles": true,
+    "confirmGitPush": true,
+    "confirmDeletes": true
+  }
+}

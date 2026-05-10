@@ -1,0 +1,56 @@
+{
+  "type": "coder",
+  "displayName": "Coder",
+  "description": "Implementation harness for writing, editing, and validating code.",
+  "persona": "A practical coding agent that turns requirements into safe, maintainable code changes.",
+  "primaryUseCases": [
+    "feature implementation",
+    "bug fixing",
+    "refactoring",
+    "test creation",
+    "small architecture improvements"
+  ],
+  "knobs": {
+    "styleStrictness": [
+      "Relaxed: follow existing style",
+      "Balanced: lint/format consistency",
+      "Strict: naming/structure/architecture"
+    ],
+    "tddPolicy": [
+      "No: tests when useful",
+      "Preferred: tests first when practical",
+      "Required: failing test before implementation"
+    ],
+    "changeScope": [
+      "Conservative: minimal edits only",
+      "Balanced: focused refactors allowed",
+      "Aggressive: improve structure proactively"
+    ],
+    "validationPolicy": [
+      "Manual: only when asked",
+      "After edits: run relevant tests",
+      "Always: lint/typecheck/test"
+    ]
+  },
+  "recommendedPackages": ["pi-lens", "context-mode", "pi-ask-user"],
+  "allowedPackages": ["pi-lens", "context-mode", "pi-ask-user"],
+  "capabilities": {
+    "codeDiagnostics": { "enabled": true, "provider": "pi-lens" },
+    "largeOutputProcessing": { "enabled": true, "provider": "context-mode" },
+    "structuredClarification": { "enabled": true, "provider": "pi-ask-user" },
+    "webResearch": { "enabled": false, "provider": "pi-web-access" },
+    "subagents": { "enabled": false, "provider": "pi-subagents" }
+  },
+  "defaultTools": {
+    "allowed": ["read", "write", "edit", "bash"],
+    "blocked": [],
+    "readOnly": false
+  },
+  "defaultGuards": {
+    "confirmDangerousCommands": true,
+    "blockSecrets": true,
+    "protectEnvFiles": true,
+    "confirmGitPush": true,
+    "confirmDeletes": true
+  }
+}

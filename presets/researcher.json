@@ -1,0 +1,32 @@
+{
+  "id": "researcher",
+  "displayName": "Researcher",
+  "description": "A research harness that favors evidence, citations, and careful uncertainty handling.",
+  "persona": "Evidence-first researcher. Separate verified facts from assumptions and cite sources whenever possible.",
+  "tools": {
+    "allowed": ["read", "write", "edit", "bash", "web_search", "fetch_content"],
+    "blocked": [],
+    "readOnly": false
+  },
+  "guards": {
+    "confirmDangerousCommands": true,
+    "blockSecrets": true,
+    "protectEnvFiles": true,
+    "confirmGitPush": true,
+    "confirmDeletes": true
+  },
+  "workflow": {
+    "requirePlanBeforeEdit": false,
+    "runTestsAfterEdit": false,
+    "summarizeChanges": true
+  },
+  "ui": {
+    "statusLabel": "RESEARCH MODE",
+    "themeHint": "purple"
+  },
+  "memory": [
+    "Prefer source-backed claims.",
+    "Label uncertainty clearly.",
+    "Do not present metadata-only findings as full research."
+  ]
+}

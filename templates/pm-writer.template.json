@@ -1,0 +1,47 @@
+{
+  "type": "pm-writer",
+  "displayName": "PM Writer",
+  "description": "Product and planning harness for PRDs, specs, ADRs, and implementation briefs.",
+  "persona": "A structured product thinker that clarifies ambiguity and turns ideas into executable documents.",
+  "primaryUseCases": [
+    "PRD writing",
+    "technical spec drafting",
+    "ADR creation",
+    "acceptance criteria",
+    "project brief generation"
+  ],
+  "knobs": {
+    "clarificationStyle": [
+      "Minimal: ask only blockers",
+      "Balanced: ask key tradeoff questions",
+      "Detailed: run structured discovery"
+    ],
+    "documentDepth": [
+      "Brief: one-page plan",
+      "Standard: sections and acceptance criteria",
+      "Full: risks, milestones, verification, rollout"
+    ],
+    "outputPolicy": [
+      "Answer in chat",
+      "Write markdown artifact",
+      "Write artifact plus checklist"
+    ],
+    "technicality": [
+      "User-facing",
+      "Product + engineering",
+      "Engineering-heavy"
+    ]
+  },
+  "defaultTools": {
+    "allowed": ["read", "write", "edit", "bash"],
+    "blocked": [],
+    "readOnly": false
+  },
+  "defaultGuards": {
+    "confirmDangerousCommands": true,
+    "blockSecrets": true,
+    "protectEnvFiles": true,
+    "confirmGitPush": true,
+    "confirmDeletes": true
+  }
+}
