@@ -48,6 +48,7 @@ function createRuntimeHarness() {
 	const notifications = [];
 	const statuses = [];
 	const confirmations = [];
+	const confirmationResponses = [];
 	const pi = {
 		registerCommand(name, config) {
 			commands.set(name, config);
@@ -66,12 +67,20 @@ function createRuntimeHarness() {
 			},
 			async confirm(title, message) {
 				confirmations.push({ title, message });
-				return false;
+				return confirmationResponses.shift() ?? false;
 			},
 		},
 	};
 	registerHarnessFactory(pi);
-	return { commands, hooks, notifications, statuses, confirmations, ctx };
+	return {
+		commands,
+		hooks,
+		notifications,
+		statuses,
+		confirmations,
+		confirmationResponses,
+		ctx,
+	};
 }
 
 const runtime = createRuntimeHarness();
@@ -83,13 +92,24 @@ assert.equal(runtime.hooks.has("tool_call"), true);
 
 await runtime.commands.get("factory").handler("list", runtime.ctx);
 assert.match(runtime.notifications.at(-1).message, /strict-coder/);
+assert.match(runtime.notifications.at(-1).message, /\* strict-coder/);
+
+await runtime.commands
+	.get("factory")
+	.handler("copy strict-coder Runtime Test Harness", runtime.ctx);
+assert.match(runtime.notifications.at(-1).message, /Created harness profile copy/);
+await runtime.commands.get("factory").handler("preview runtime-test-harness", runtime.ctx);
+assert.match(runtime.notifications.at(-1).message, /Runtime Test Harness/);
 
 await runtime.commands.get("factory").handler("use strict-coder", runtime.ctx);
 assert.deepEqual(runtime.statuses.at(-1), {
 	key: "harness-factory",
 	value: "STRICT-CODER",
 });
-assert.match(runtime.notifications.at(-1).message, /Activated harness: strict coder/);
+assert.match(
+	runtime.notifications.at(-1).message,
+	/Activated harness: strict coder/,
+);
 
 const promptPatch = await runtime.hooks.get("before_agent_start")({
 	systemPrompt: "Base prompt",
@@ -115,5 +135,17 @@ assert.deepEqual(blockedSecret, {
 	block: true,
 	reason: "Sensitive file access denied by user",
 });
+
+await runtime.commands.get("factory").handler("deactivate", runtime.ctx);
+assert.match(runtime.notifications.at(-1).message, /Deactivated harness/);
+const noPromptPatch = await runtime.hooks.get("before_agent_start")({
+	systemPrompt: "Base prompt",
+});
+assert.equal(noPromptPatch, undefined);
+
+runtime.confirmationResponses.push(true);
+await runtime.commands.get("factory").handler("delete runtime-test-harness", runtime.ctx);
+assert.match(runtime.confirmations.at(-1).message, /runtime-test-harness/);
+assert.match(runtime.notifications.at(-1).message, /Deleted harness profile/);
 
 console.log("harness-factory enforcement tests passed");
