@@ -5,7 +5,6 @@ import {
 	readdirSync,
 	writeFileSync,
 	existsSync,
-	unlinkSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -91,17 +90,6 @@ function saveProjectProfile(profile: HarnessProfile) {
 		JSON.stringify(profile, null, 2) + "\n",
 		"utf8",
 	);
-}
-
-function deleteProjectProfile(id: string): boolean {
-	const profilePath = join(projectProfileDir, `${id}.json`);
-	if (!existsSync(profilePath)) return false;
-	unlinkSync(profilePath);
-	return true;
-}
-
-function clearActiveProfile() {
-	if (existsSync(activePath)) unlinkSync(activePath);
 }
 
 function findProfile(id: string): HarnessProfile | undefined {
@@ -337,7 +325,7 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	const handleFactoryCommand = async (args: string, ctx: any) => {
-		const [rawCommand, rawId, ...restArgs] = args.trim().split(/\s+/);
+		const [rawCommand, rawId] = args.trim().split(/\s+/);
 		let command = rawCommand;
 		let id = rawId;
 		const profiles = loadAllProfiles();
@@ -352,7 +340,7 @@ export default function (pi: ExtensionAPI) {
 
 		if (!command || command === "help") {
 			ctx.ui.notify(
-				"Usage: /factory list | create [coder] | copy <id> <new-name> | use [id] | switch [id] | preview [id] | <profile-id> | active | deactivate | delete <id>",
+				"Usage: /factory list | create [coder] | use [id] | switch [id] | preview [id] | <profile-id> | active",
 				"info",
 			);
 			return;
@@ -361,10 +349,10 @@ export default function (pi: ExtensionAPI) {
 		if (command === "list") {
 			ctx.ui.notify(
 				profiles
-					.map((profile) => {
-						const marker = active?.id === profile.id ? "*" : " ";
-						return `${marker} ${profile.id} — ${profile.displayName}: ${profile.description}`;
-					})
+					.map(
+						(profile) =>
+							`${profile.id} — ${profile.displayName}: ${profile.description}`,
+					)
 					.join("\n"),
 				"info",
 			);
@@ -376,14 +364,6 @@ export default function (pi: ExtensionAPI) {
 				active ? preview(active) : "No active harness profile.",
 				"info",
 			);
-			return;
-		}
-
-		if (command === "deactivate" || command === "off") {
-			clearActiveProfile();
-			active = null;
-			ctx.ui.setStatus("harness-factory", "");
-			ctx.ui.notify("Deactivated harness profile.", "info");
 			return;
 		}
 
@@ -473,70 +453,6 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		if (command === "copy" || command === "clone") {
-			if (!id || !restArgs.length) {
-				ctx.ui.notify("Usage: /factory copy <profile-id> <new display name>", "error");
-				return;
-			}
-			const source = findProfile(id);
-			if (!source) {
-				ctx.ui.notify(`Unknown harness profile: ${id}`, "error");
-				return;
-			}
-			const displayName = restArgs.join(" ");
-			const nextProfile = {
-				...source,
-				id: slugify(displayName),
-				displayName,
-				description: `Project-local copy of ${source.id}.`,
-			};
-			if (findProfile(nextProfile.id)) {
-				ctx.ui.notify(`Profile already exists: ${nextProfile.id}`, "error");
-				return;
-			}
-			saveProjectProfile(nextProfile);
-			ctx.ui.notify(
-				`Created harness profile copy: ${nextProfile.displayName} (${nextProfile.id})`,
-				"info",
-			);
-			return;
-		}
-
-		if (command === "delete" || command === "remove") {
-			if (!id) {
-				ctx.ui.notify("Usage: /factory delete <project-profile-id>", "error");
-				return;
-			}
-			const profile = findProfile(id);
-			if (!profile) {
-				ctx.ui.notify(`Unknown harness profile: ${id}`, "error");
-				return;
-			}
-			if (!existsSync(join(projectProfileDir, `${id}.json`))) {
-				ctx.ui.notify(
-					`Cannot delete bundled preset '${id}'. Copy it first, then delete the project-local copy.`,
-					"error",
-				);
-				return;
-			}
-			const ok = await ctx.ui.confirm(
-				"Delete harness profile?",
-				`Delete project-local harness profile ${profile.displayName} (${profile.id})?`,
-			);
-			if (!ok) {
-				ctx.ui.notify("Delete cancelled", "info");
-				return;
-			}
-			deleteProjectProfile(id);
-			if (active?.id === id) {
-				clearActiveProfile();
-				active = null;
-				ctx.ui.setStatus("harness-factory", "");
-			}
-			ctx.ui.notify(`Deleted harness profile: ${id}`, "info");
-			return;
-		}
-
 		if ((command === "use" || command === "preview") && !id) {
 			const selected = await ctx.ui.select(
 				command === "use" ? "Activate harness" : "Preview harness",
@@ -580,7 +496,7 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		ctx.ui.notify(
-			`Unknown factory command: ${command}\nUsage: /factory list | create [coder] | copy <id> <new-name> | use [id] | preview [id] | <profile-id> | active | deactivate | delete <id>`,
+			`Unknown factory command: ${command}\nUsage: /factory list | create [coder] | use [id] | preview [id] | <profile-id> | active`,
 			"error",
 		);
 	};
