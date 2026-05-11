@@ -1,10 +1,12 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { HarnessGalleryDemo, type HarnessCard } from "./factory-tui-demo.js";
 import {
 	mkdirSync,
 	readFileSync,
 	readdirSync,
 	writeFileSync,
 	existsSync,
+	unlinkSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -92,8 +94,66 @@ function saveProjectProfile(profile: HarnessProfile) {
 	);
 }
 
+function projectProfilePath(id: string): string {
+	return join(projectProfileDir, `${id}.json`);
+}
+
+function isProjectProfile(id: string): boolean {
+	return existsSync(projectProfilePath(id));
+}
+
+function deleteProjectProfile(id: string): boolean {
+	if (!isProjectProfile(id)) return false;
+	unlinkSync(projectProfilePath(id));
+	return true;
+}
+
+function clearActiveProfile() {
+	if (existsSync(activePath)) unlinkSync(activePath);
+}
+
 function findProfile(id: string): HarnessProfile | undefined {
 	return loadAllProfiles().find((profile) => profile.id === id);
+}
+
+function cloneProfile(
+	profile: HarnessProfile,
+	displayName: string,
+): HarnessProfile {
+	return {
+		...profile,
+		id: slugify(displayName),
+		displayName,
+		description: `Project-local copy of ${profile.id}.`,
+		ui: {
+			...profile.ui,
+			statusLabel: slugify(displayName).toUpperCase().slice(0, 20),
+		},
+		memory: [...profile.memory],
+		tools: {
+			...profile.tools,
+			allowed: [...profile.tools.allowed],
+			blocked: [...profile.tools.blocked],
+		},
+		guards: { ...profile.guards },
+		workflow: { ...profile.workflow },
+		policies: profile.policies ? { ...profile.policies } : undefined,
+		packages: profile.packages
+			? {
+					recommended: [...profile.packages.recommended],
+					allowed: [...profile.packages.allowed],
+					installCommands: [...profile.packages.installCommands],
+				}
+			: undefined,
+		capabilities: profile.capabilities
+			? Object.fromEntries(
+					Object.entries(profile.capabilities).map(([name, capability]) => [
+						name,
+						{ ...capability },
+					]),
+				)
+			: undefined,
+	};
 }
 
 function slugify(value: string): string {
@@ -175,7 +235,111 @@ export function buildHarnessInstructions(profile: HarnessProfile): string {
 	return lines.filter((line): line is string => line !== undefined).join("\n");
 }
 
-function buildCoderProfile(options: {
+function normalizeChoice(value: string, fallback: string): string {
+	return value.split("—")[0]?.trim() || fallback;
+}
+
+function buildHarnessingProfile(options: {
+	displayName: string;
+	role: string;
+	preset: string;
+	mutationScope: string;
+	validationStrictness: string;
+	safetyLevel: string;
+	autonomy: string;
+	outputStyle: string;
+}): HarnessProfile {
+	const role = normalizeChoice(options.role, "Coder");
+	const mutationScope = normalizeChoice(options.mutationScope, "Minimal edits");
+	const validationStrictness = normalizeChoice(
+		options.validationStrictness,
+		"After edits",
+	);
+	const safetyLevel = normalizeChoice(options.safetyLevel, "Strict");
+	const autonomy = normalizeChoice(options.autonomy, "Plan then act");
+	const outputStyle = normalizeChoice(options.outputStyle, "Concise summary");
+	const readOnly = mutationScope === "Read-only" || role === "Reviewer";
+	const id = slugify(options.displayName);
+	const type = role.toLowerCase().replace(/\s+\/\s+/g, "-");
+	const alwaysValidate = ["Always", "Test-first", "Release-grade"].includes(
+		validationStrictness,
+	);
+	const testFirst = validationStrictness === "Test-first";
+	const strictSafety = ["Strict", "Read-only", "Release-safe"].includes(
+		safetyLevel,
+	);
+	const allowedTools = readOnly
+		? ["read", "bash"]
+		: role === "Researcher"
+			? ["read", "write", "edit", "bash", "web_search", "fetch_content"]
+			: ["read", "write", "edit", "bash"];
+	const blockedTools = readOnly ? ["write", "edit"] : [];
+	const memory = [
+		`Role: ${role}.`,
+		`Role preset: ${options.preset}.`,
+		`Mutation scope: ${mutationScope}.`,
+		`Validation strictness: ${validationStrictness}.`,
+		`Safety level: ${safetyLevel}.`,
+		`Autonomy: ${autonomy}.`,
+		`Output style: ${outputStyle}.`,
+	];
+	return {
+		id,
+		displayName: options.displayName,
+		type,
+		description: `${role} harness generated from ${options.preset}.`,
+		persona: `${role} harness compiled from functional constraints: ${mutationScope}, ${validationStrictness}, ${safetyLevel}, ${autonomy}.`,
+		policies: {
+			role,
+			preset: options.preset,
+			mutationScope,
+			validationStrictness,
+			safetyLevel,
+			autonomy,
+			outputStyle,
+		},
+		packages: {
+			recommended: ["pi-lens", "context-mode", "pi-ask-user"],
+			allowed: ["pi-lens", "context-mode", "pi-ask-user"],
+			installCommands: [
+				"pi install npm:pi-lens",
+				"pi install npm:context-mode",
+				"pi install npm:pi-ask-user",
+			],
+		},
+		capabilities: {
+			codeDiagnostics: { enabled: role !== "Researcher", provider: "pi-lens" },
+			largeOutputProcessing: { enabled: true, provider: "context-mode" },
+			structuredClarification: { enabled: true, provider: "pi-ask-user" },
+			webResearch: {
+				enabled: role === "Researcher",
+				provider: "pi-web-access",
+			},
+			subagents: { enabled: false, provider: "pi-subagents" },
+		},
+		tools: { allowed: allowedTools, blocked: blockedTools, readOnly },
+		guards: {
+			confirmDangerousCommands: safetyLevel !== "Lightweight",
+			blockSecrets: safetyLevel !== "Lightweight",
+			protectEnvFiles: safetyLevel !== "Lightweight",
+			confirmGitPush: strictSafety,
+			confirmDeletes: safetyLevel !== "Lightweight",
+		},
+		workflow: {
+			requirePlanBeforeEdit:
+				autonomy === "Plan then act" ||
+				autonomy === "Review-gated" ||
+				testFirst,
+			runTestsAfterEdit:
+				alwaysValidate || validationStrictness === "After edits",
+			summarizeChanges: outputStyle !== "Detailed rationale" || true,
+		},
+		ui: { statusLabel: id.toUpperCase().slice(0, 20), themeHint: "green" },
+		memory,
+	};
+}
+
+export function buildCoderProfile(options: {
 	displayName: string;
 	styleStrictness: string;
 	tddPolicy: string;
@@ -262,6 +426,104 @@ function buildCoderProfile(options: {
 	};
 }
 
+function getEnabledKeys(values: Record<string, boolean | undefined>): string[] {
+	return Object.entries(values)
+		.filter(([, enabled]) => enabled)
+		.map(([name]) => name);
+}
+
+function inferSafetyLevel(profile: HarnessProfile): string {
+	const enabledGuards = getEnabledKeys(profile.guards).length;
+	if (profile.tools.readOnly || enabledGuards >= 4) return "Very High";
+	if (enabledGuards >= 2) return "High";
+	if (enabledGuards === 1) return "Medium";
+	return "Low";
+}
+
+function inferAutonomyLevel(profile: HarnessProfile): string {
+	if (profile.tools.readOnly) return "Low";
+	if (profile.workflow.requirePlanBeforeEdit || profile.guards.confirmDeletes)
+		return "Medium";
+	return "High";
+}
+
+function profileKind(profile: HarnessProfile): string {
+	if (profile.type) return profile.type;
+	if (profile.id.includes("review") || /review/i.test(profile.displayName))
+		return "reviewer";
+	if (profile.id.includes("research") || /research/i.test(profile.displayName))
+		return "researcher";
+	if (profile.id.includes("devops") || /deploy|ops/i.test(profile.displayName))
+		return "devops";
+	return "coder";
+}
+
+function profileIcon(profile: HarnessProfile): string {
+	const kind = profileKind(profile);
+	if (kind === "reviewer") return "🔍";
+	if (kind === "researcher") return "📚";
+	if (kind === "devops") return "🚀";
+	return "🛠";
+}
+
+function bestFor(profile: HarnessProfile): string {
+	const kind = profileKind(profile);
+	if (kind === "reviewer") return "reviewing diffs, finding risks";
+	if (kind === "researcher") return "evidence gathering, source-backed answers";
+	if (kind === "devops") return "diagnostics, deployment planning";
+	return "implementation, refactors, code changes";
+}
+
+export function renderHarnessCard(
+	profile: HarnessProfile,
+	options: { active?: boolean } = {},
+): string {
+	const marker = options.active ? "* " : "";
+	const guardSummary = getEnabledKeys(profile.guards).join(", ") || "none";
+	const workflowSummary = getEnabledKeys(profile.workflow).join(", ") || "none";
+	const title = `${marker}${profileIcon(profile)} ${profile.displayName} (${profile.id})`;
+	return [
+		`┌─ ${title} ─`,
+		`│ ${profile.description}`,
+		`│ Best for: ${bestFor(profile)}`,
+		`│ Safety: ${inferSafetyLevel(profile)} · Autonomy: ${inferAutonomyLevel(profile)}`,
+		`│ Guards: ${guardSummary}`,
+		`│ Workflow: ${workflowSummary}`,
+		`│ Use: /factory pick ${profile.id}`,
+		"└────────────────────────────────────────",
+	].join("\n");
+}
+
+export function renderHarnessGallery(
+	profiles: HarnessProfile[],
+	activeId?: string,
+): string {
+	return [
+		"Harness cards",
+		"Run /factory browse for an interactive selector, or /factory pick <id> for an action menu.",
+		"",
+		...profiles.map((profile) =>
+			renderHarnessCard(profile, { active: profile.id === activeId }),
+		),
+	].join("\n\n");
+}
+
+function toHarnessCard(profile: HarnessProfile): HarnessCard {
+	return {
+		id: profile.id,
+		displayName: profile.displayName,
+		description: profile.description,
+		type: profile.type,
+		icon: profileIcon(profile),
+		bestFor: bestFor(profile),
+		safetyLevel: inferSafetyLevel(profile),
+		autonomyLevel: inferAutonomyLevel(profile),
+		statusLabel: profile.ui.statusLabel,
+		guards: getEnabledKeys(profile.guards),
+		workflow: getEnabledKeys(profile.workflow),
+	};
+}
+
 function preview(profile: HarnessProfile): string {
 	return [
 		`${profile.displayName} (${profile.id})`,
@@ -338,24 +600,401 @@ export default function (pi: ExtensionAPI) {
 		if (command === "switch" || command === "activate") command = "use";
 		if (command === "show" || command === "inspect") command = "preview";
 
-		if (!command || command === "help") {
+		if (!command) {
+			const action = await ctx.ui.select("Harness Factory", [
+				"Use a harness",
+				"Create a harness",
+				"Current harness",
+				"Manage harnesses",
+			]);
+			if (action === "Use a harness") {
+				await handleFactoryCommand("browse", ctx);
+				return;
+			}
+			if (action === "Create a harness") {
+				await handleFactoryCommand("create", ctx);
+				return;
+			}
+			if (action === "Current harness") {
+				await handleFactoryCommand("active", ctx);
+				return;
+			}
+			if (action === "Manage harnesses") {
+				await handleFactoryCommand("manage", ctx);
+				return;
+			}
+			ctx.ui.notify("Factory cancelled", "info");
+			return;
+		}
+
+		if (command === "browse") {
+			const selectedId = await ctx.ui.custom(
+				(
+					_tui: unknown,
+					_theme: unknown,
+					_keybindings: unknown,
+					done: (result: string | undefined) => void,
+				) => {
+					const component = new HarnessGalleryDemo(profiles.map(toHarnessCard));
+					component.onSelect = (profileId) => done(profileId);
+					component.onCancel = () => done(undefined);
+					return component;
+				},
+			);
+			if (typeof selectedId === "string" && selectedId) {
+				await handleFactoryCommand(`pick ${selectedId}`, ctx);
+			} else {
+				ctx.ui.notify("Browse cancelled", "info");
+			}
+			return;
+		}
+
+		if (command === "help") {
 			ctx.ui.notify(
-				"Usage: /factory list | create [coder] | use [id] | switch [id] | preview [id] | <profile-id> | active",
+				"Usage: /factory | /factory browse | /factory list | /factory pick [id] | /factory create | /factory manage | /factory use [id] | /factory preview [id] | /factory active",
 				"info",
 			);
 			return;
 		}
 
 		if (command === "list") {
+			ctx.ui.notify(renderHarnessGallery(profiles, active?.id), "info");
+			return;
+		}
+
+		if (command === "manage") {
+			const action = await ctx.ui.select("Manage harnesses", [
+				"Duplicate harness",
+				"Edit project harness",
+				"Delete project harness",
+				"Import / Export",
+			]);
+			if (action === "Duplicate harness") {
+				const sourceId = await ctx.ui.select(
+					"Duplicate source harness",
+					profiles.map((profile) => profile.id),
+				);
+				const source = sourceId ? findProfile(sourceId) : undefined;
+				if (!source) {
+					ctx.ui.notify("Duplicate cancelled", "info");
+					return;
+				}
+				const displayName = await ctx.ui.input(
+					"New harness name",
+					`${source.displayName} Copy`,
+				);
+				if (!displayName) {
+					ctx.ui.notify("Duplicate cancelled", "info");
+					return;
+				}
+				const copy = cloneProfile(source, displayName);
+				if (findProfile(copy.id)) {
+					ctx.ui.notify(`Profile already exists: ${copy.id}`, "error");
+					return;
+				}
+				const saveAction = await ctx.ui.select("Save duplicated harness?", [
+					"Save only",
+					"Save & Activate",
+					"Cancel",
+				]);
+				if (saveAction === "Cancel") {
+					ctx.ui.notify("Duplicate cancelled", "info");
+					return;
+				}
+				const ok = await ctx.ui.confirm("Duplicate harness?", preview(copy));
+				if (!ok) {
+					ctx.ui.notify("Duplicate cancelled", "info");
+					return;
+				}
+				saveProjectProfile(copy);
+				if (saveAction === "Save & Activate") {
+					active = copy;
+					saveActiveProfile(copy);
+					ctx.ui.setStatus("harness-factory", copy.ui.statusLabel);
+				}
+				ctx.ui.notify(
+					`Duplicated harness profile: ${copy.displayName} (${copy.id})`,
+					"info",
+				);
+				return;
+			}
+			if (action === "Edit project harness") {
+				const projectProfiles = loadProjectProfiles();
+				if (!projectProfiles.length) {
+					ctx.ui.notify(
+						"No project-local harnesses to edit. Duplicate or create one first.",
+						"info",
+					);
+					return;
+				}
+				const targetId = await ctx.ui.select(
+					"Edit project harness",
+					projectProfiles.map((profile) => profile.id),
+				);
+				const target = targetId ? findProfile(targetId) : undefined;
+				if (!target || !targetId) {
+					ctx.ui.notify("Edit cancelled", "info");
+					return;
+				}
+				const mutationScope = await ctx.ui.select("What can it change?", [
+					"Read-only — no write/edit",
+					"Artifacts only — notes/plans, not source code",
+					"Minimal edits — small targeted changes only",
+					"Focused refactors — refactors within requested area",
+					"Broad refactors — restructure proactively when useful",
+				]);
+				const validationStrictness = await ctx.ui.select(
+					"How strict should validation be?",
+					[
+						"Manual — validate only when asked",
+						"After edits — run relevant tests after changes",
+						"Always — run lint/typecheck/test when available",
+						"Test-first — add/update tests before implementation when feasible",
+						"Release-grade — test, typecheck, lint, smoke test, summarize risk",
+					],
+				);
+				const safetyLevel = await ctx.ui.select("Which safety gates?", [
+					"Lightweight — minimal confirmations",
+					"Balanced — protect secrets and destructive operations",
+					"Strict — confirm secrets, deletes, git push, dangerous commands",
+					"Read-only — strict safety with no edits",
+					"Release-safe — strict plus deployment/publish caution",
+				]);
+				const autonomy = await ctx.ui.select("How should it proceed?", [
+					"Ask first — clarify before acting",
+					"Plan then act — state a concise plan before edits",
+					"Act within scope — proceed if request is clear",
+					"Autonomous — complete multi-step tasks with fewer interruptions",
+					"Review-gated — confirm before risky changes",
+				]);
+				const outputStyle = await ctx.ui.select(
+					"How should it report results?",
+					[
+						"Concise summary — changed files and validation results",
+						"Detailed rationale — decisions and tradeoffs",
+						"Findings table — severity, file, issue, recommendation",
+						"Artifact-first — write plans/specs/docs to files",
+					],
+				);
+				if (
+					!mutationScope ||
+					!validationStrictness ||
+					!safetyLevel ||
+					!autonomy ||
+					!outputStyle
+				) {
+					ctx.ui.notify("Edit cancelled", "info");
+					return;
+				}
+				const updated = buildHarnessingProfile({
+					displayName: target.displayName,
+					role: String(target.policies?.role ?? target.type ?? "Custom"),
+					preset: String(target.policies?.preset ?? "Edited project harness"),
+					mutationScope,
+					validationStrictness,
+					safetyLevel,
+					autonomy,
+					outputStyle,
+				});
+				updated.id = target.id;
+				updated.description = target.description;
+				const ok = await ctx.ui.confirm(
+					"Save harness edits?",
+					preview(updated),
+				);
+				if (!ok) {
+					ctx.ui.notify("Edit cancelled", "info");
+					return;
+				}
+				saveProjectProfile(updated);
+				if (active?.id === updated.id) {
+					active = updated;
+					saveActiveProfile(updated);
+					ctx.ui.setStatus("harness-factory", updated.ui.statusLabel);
+				}
+				ctx.ui.notify(
+					`Updated harness profile: ${updated.displayName} (${updated.id})`,
+					"info",
+				);
+				return;
+			}
+			if (action === "Import / Export") {
+				const transferAction = await ctx.ui.select("Import / Export", [
+					"Export harness",
+					"Import harness",
+					"Cancel",
+				]);
+				if (transferAction === "Export harness") {
+					const sourceId = await ctx.ui.select(
+						"Export harness",
+						profiles.map((profile) => profile.id),
+					);
+					const source = sourceId ? findProfile(sourceId) : undefined;
+					if (!source) {
+						ctx.ui.notify("Export cancelled", "info");
+						return;
+					}
+					const outputPath = await ctx.ui.input(
+						"Export path",
+						`.pi/harness-factory/${source.id}.json`,
+					);
+					if (!outputPath) {
+						ctx.ui.notify("Export cancelled", "info");
+						return;
+					}
+					const ok = await ctx.ui.confirm(
+						"Export harness?",
+						`Write ${source.displayName} (${source.id}) to ${outputPath}?`,
+					);
+					if (!ok) {
+						ctx.ui.notify("Export cancelled", "info");
+						return;
+					}
+					const absoluteOutputPath = resolve(process.cwd(), outputPath);
+					mkdirSync(dirname(absoluteOutputPath), { recursive: true });
+					writeFileSync(
+						absoluteOutputPath,
+						JSON.stringify(source, null, 2) + "\n",
+						"utf8",
+					);
+					ctx.ui.notify(`Exported harness profile: ${outputPath}`, "info");
+					return;
+				}
+				if (transferAction === "Import harness") {
+					const inputPath = await ctx.ui.input(
+						"Import path",
+						".pi/harness-factory/profile.json",
+					);
+					if (!inputPath) {
+						ctx.ui.notify("Import cancelled", "info");
+						return;
+					}
+					let imported: HarnessProfile;
+					try {
+						imported = JSON.parse(
+							readFileSync(resolve(process.cwd(), inputPath), "utf8"),
+						) as HarnessProfile;
+					} catch (error) {
+						ctx.ui.notify(
+							`Import failed: ${(error as Error).message}`,
+							"error",
+						);
+						return;
+					}
+					if (
+						!imported.id ||
+						!imported.displayName ||
+						!imported.tools ||
+						!imported.guards ||
+						!imported.workflow ||
+						!imported.ui ||
+						!Array.isArray(imported.memory)
+					) {
+						ctx.ui.notify(
+							"Import failed: invalid harness profile JSON",
+							"error",
+						);
+						return;
+					}
+					if (findProfile(imported.id)) {
+						ctx.ui.notify(`Profile already exists: ${imported.id}`, "error");
+						return;
+					}
+					const ok = await ctx.ui.confirm("Import harness?", preview(imported));
+					if (!ok) {
+						ctx.ui.notify("Import cancelled", "info");
+						return;
+					}
+					saveProjectProfile(imported);
+					ctx.ui.notify(
+						`Imported harness profile: ${imported.displayName} (${imported.id})`,
+						"info",
+					);
+					return;
+				}
+				ctx.ui.notify("Import / Export cancelled", "info");
+				return;
+			}
+			if (action === "Delete project harness") {
+				const targetId = await ctx.ui.select(
+					"Delete project harness",
+					profiles.map((profile) => profile.id),
+				);
+				if (!targetId) {
+					ctx.ui.notify("Delete cancelled", "info");
+					return;
+				}
+				const target = findProfile(targetId);
+				if (!target) {
+					ctx.ui.notify(`Unknown harness profile: ${targetId}`, "error");
+					return;
+				}
+				if (!isProjectProfile(targetId)) {
+					ctx.ui.notify(
+						"Bundled presets cannot be deleted. Duplicate a preset first, then delete the project-local copy.",
+						"error",
+					);
+					return;
+				}
+				const ok = await ctx.ui.confirm(
+					"Delete harness?",
+					`Delete project-local harness ${target.displayName} (${target.id})?`,
+				);
+				if (!ok) {
+					ctx.ui.notify("Delete cancelled", "info");
+					return;
+				}
+				deleteProjectProfile(targetId);
+				if (active?.id === targetId) {
+					active = null;
+					clearActiveProfile();
+					ctx.ui.setStatus("harness-factory", undefined);
+				}
+				ctx.ui.notify(`Deleted harness profile: ${targetId}`, "info");
+				return;
+			}
 			ctx.ui.notify(
-				profiles
-					.map(
-						(profile) =>
-							`${profile.id} — ${profile.displayName}: ${profile.description}`,
-					)
-					.join("\n"),
+				`${action ?? "Manage action"} is not implemented yet.`,
 				"info",
 			);
+			return;
+		}
+
+		if (command === "pick") {
+			const selectedId =
+				id ??
+				(await ctx.ui.select(
+					"Pick a harness",
+					profiles.map((profile) => profile.id),
+				));
+			if (!selectedId) {
+				ctx.ui.notify("Pick cancelled", "info");
+				return;
+			}
+			const selectedProfile = findProfile(selectedId);
+			if (!selectedProfile) {
+				ctx.ui.notify(`Unknown harness profile: ${selectedId}`, "error");
+				return;
+			}
+			const action = await ctx.ui.select(
+				`${selectedProfile.displayName} selected`,
+				["Activate", "Preview full policy", "Cancel"],
+			);
+			if (action === "Activate") {
+				saveActiveProfile(selectedProfile);
+				active = selectedProfile;
+				ctx.ui.setStatus("harness-factory", selectedProfile.ui.statusLabel);
+				ctx.ui.notify(
+					`Activated harness: ${selectedProfile.displayName}. Run /reload if other generated files are added later.`,
+					"info",
+				);
+				return;
+			}
+			if (action === "Preview full policy") {
+				ctx.ui.notify(preview(selectedProfile), "info");
+				return;
+			}
+			ctx.ui.notify("Pick cancelled", "info");
 			return;
 		}
 
@@ -367,85 +1006,134 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		if (command === "create") {
-			const requestedType = id;
-			const type = requestedType
-				? requestedType.toLowerCase()
-				: await ctx.ui.select("Harness type", [
-						"coder",
-						"reviewer",
-						"researcher",
-						"devops",
-					]);
-			if (!type) {
-				ctx.ui.notify("Create cancelled", "info");
-				return;
-			}
-			if (type !== "coder") {
-				ctx.ui.notify(
-					`Typed builder for '${type}' is not implemented yet. Try /factory create coder.`,
-					"warning",
-				);
-				return;
-			}
+		if (command === "demo-wizard") {
+			const action = await ctx.ui.select("Factory wizard demo", [
+				"Create harness",
+				"Browse harnesses",
+				"Inspect active harness",
+			]);
+			ctx.ui.notify(
+				action ? `Wizard demo selected: ${action}` : "Wizard demo cancelled",
+				"info",
+			);
+			return;
+		}
 
+		if (command === "demo-tui") {
+			await handleFactoryCommand("browse", ctx);
+			return;
+		}
+
+		if (command === "create") {
+			const role = id
+				? id
+				: await ctx.ui.select("What kind of harness?", [
+						"Coder — implements code changes",
+						"Reviewer — reviews code, diffs, plans, and risks",
+						"Researcher — gathers evidence and cites sources",
+						"DevOps — handles diagnostics, infra, deploy workflows",
+						"PM / Writer — writes specs, plans, docs, tickets",
+						"Custom — start from a blank configurable harness",
+					]);
+			if (!role) {
+				ctx.ui.notify("Create cancelled", "info");
+				return;
+			}
+			const normalizedRole = normalizeChoice(role, "Coder");
+			const preset = await ctx.ui.select(`${normalizedRole} harness preset`, [
+				"Safe implementation — minimal edits, safety gates, tests after edits",
+				"Strict TDD — test-first, strict structure, full validation",
+				"Read-only review — no write/edit, findings only",
+				"Evidence researcher — citations, facts vs assumptions",
+				"Release operator — deployment readiness and rollback risk",
+			]);
 			const displayName = await ctx.ui.input(
-				"Coder harness name",
-				"Strict TDD Coder",
+				"Harness name",
+				`${normalizedRole} Harness`,
 			);
-			if (!displayName) {
+			const mutationScope = await ctx.ui.select("What can it change?", [
+				"Read-only — no write/edit",
+				"Artifacts only — notes/plans, not source code",
+				"Minimal edits — small targeted changes only",
+				"Focused refactors — refactors within requested area",
+				"Broad refactors — restructure proactively when useful",
+			]);
+			const validationStrictness = await ctx.ui.select(
+				"How strict should validation be?",
+				[
+					"Manual — validate only when asked",
+					"After edits — run relevant tests after changes",
+					"Always — run lint/typecheck/test when available",
+					"Test-first — add/update tests before implementation when feasible",
+					"Release-grade — test, typecheck, lint, smoke test, summarize risk",
+				],
+			);
+			const safetyLevel = await ctx.ui.select("Which safety gates?", [
+				"Lightweight — minimal confirmations",
+				"Balanced — protect secrets and destructive operations",
+				"Strict — confirm secrets, deletes, git push, dangerous commands",
+				"Read-only — strict safety with no edits",
+				"Release-safe — strict plus deployment/publish caution",
+			]);
+			const autonomy = await ctx.ui.select("How should it proceed?", [
+				"Ask first — clarify before acting",
+				"Plan then act — state a concise plan before edits",
+				"Act within scope — proceed if request is clear",
+				"Autonomous — complete multi-step tasks with fewer interruptions",
+				"Review-gated — confirm before risky changes",
+			]);
+			const outputStyle = await ctx.ui.select("How should it report results?", [
+				"Concise summary — changed files and validation results",
+				"Detailed rationale — decisions and tradeoffs",
+				"Findings table — severity, file, issue, recommendation",
+				"Artifact-first — write plans/specs/docs to files",
+			]);
+			if (
+				!preset ||
+				!displayName ||
+				!mutationScope ||
+				!validationStrictness ||
+				!safetyLevel ||
+				!autonomy ||
+				!outputStyle
+			) {
 				ctx.ui.notify("Create cancelled", "info");
 				return;
 			}
-			const styleStrictness = await ctx.ui.select("Coding style strictness", [
-				"Relaxed: follow existing style",
-				"Balanced: lint/format consistency",
-				"Strict: naming/structure/architecture",
-			]);
-			const tddPolicy = await ctx.ui.select("TDD policy", [
-				"No: tests when useful",
-				"Preferred: tests first when practical",
-				"Required: failing test before implementation",
-			]);
-			const changeScope = await ctx.ui.select("Change scope", [
-				"Conservative: minimal edits only",
-				"Balanced: focused refactors allowed",
-				"Aggressive: improve structure proactively",
-			]);
-			const validationPolicy = await ctx.ui.select("Validation policy", [
-				"Manual: only when asked",
-				"After edits: run relevant tests",
-				"Always: lint/typecheck/test",
-			]);
-			if (!styleStrictness || !tddPolicy || !changeScope || !validationPolicy) {
-				ctx.ui.notify("Create cancelled", "info");
-				return;
-			}
-			const additionalNotes = await ctx.ui.input(
-				"Additional coder rules (optional)",
-				"e.g. prefer small functions and explicit errors",
-			);
-			const profile = buildCoderProfile({
+			const profile = buildHarnessingProfile({
 				displayName,
-				styleStrictness,
-				tddPolicy,
-				changeScope,
-				validationPolicy,
-				additionalNotes: additionalNotes ?? undefined,
+				role,
+				preset,
+				mutationScope,
+				validationStrictness,
+				safetyLevel,
+				autonomy,
+				outputStyle,
 			});
 			if (findProfile(profile.id)) {
 				ctx.ui.notify(`Profile already exists: ${profile.id}`, "error");
 				return;
 			}
-			const ok = await ctx.ui.confirm(
-				"Create coder harness?",
-				preview(profile),
-			);
+			const saveAction = await ctx.ui.select("Save generated harness?", [
+				"Save only",
+				"Save & Activate",
+				"Cancel",
+			]);
+			if (saveAction === "Cancel") {
+				ctx.ui.notify("Create cancelled", "info");
+				return;
+			}
+			const ok = await ctx.ui.confirm("Create harness?", preview(profile));
 			if (!ok) {
 				ctx.ui.notify("Create cancelled", "info");
 				return;
 			}
 			saveProjectProfile(profile);
+			if (saveAction === "Save & Activate") {
+				active = profile;
+				saveActiveProfile(profile);
+				ctx.ui.setStatus("harness-factory", profile.ui.statusLabel);
+			}
 			ctx.ui.notify(
 				`Created harness profile: ${profile.displayName} (${profile.id})`,
 				"info",
@@ -504,11 +1192,6 @@ export default function (pi: ExtensionAPI) {
 	pi.registerCommand("factory", {
 		description:
 			"Create, switch, and inspect persona-based Pi harness profiles.",
-		handler: handleFactoryCommand,
-	});
-
-	pi.registerCommand("facory", {
-		description: "Typo alias for /factory.",
 		handler: handleFactoryCommand,
 	});
 

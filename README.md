@@ -1,32 +1,14 @@
 # pi-harness-factory
 
-Create, switch, and manage persona-based harness profiles for Pi Coding Agent.
+Create, switch, and manage functional harness profiles for Pi Coding Agent.
 
 ## Concept
 
-`pi-harness-factory` turns Pi into a small factory for project-specific harness characters.
-Each harness profile defines a persona, allowed tools, safety guards, workflow preferences,
-UI status, durable memory hints, recommended Pi packages, and allowed capabilities.
+`pi-harness-factory` turns Pi into a project-local harness factory. A harness is a compiled working mode: tool access, mutation scope, validation strictness, safety gates, workflow rules, UI label, memory hints, recommended Pi packages, and capabilities.
 
-## Representative harness templates
+The goal is not just to pick a persona. The factory helps you answer:
 
-Templates are the top-level agent archetypes. Each template has its own knobs, so users do not build profiles from unlimited free-form text.
-
-- `coder` — implementation agent. Knobs: style strictness, TDD policy, change scope, validation policy.
-- `reviewer` — review agent. Knobs: review depth, edit policy, severity format, focus.
-- `researcher` — evidence agent. Knobs: citation strictness, source preference, uncertainty policy, artifact policy.
-- `devops` — operations agent. Knobs: autonomy level, destructive policy, diagnostic style, deployment policy.
-- `pm-writer` — planning/docs agent. Knobs: clarification style, document depth, output policy, technicality.
-
-Template definitions live in `templates/*.template.json`.
-
-Templates can also recommend existing Pi packages. A generated harness stores both `packages.allowed` and `capabilities`, so installing a package is separate from letting a harness use that package's capabilities.
-
-## MVP profiles
-
-- `safe-coder` — cautious everyday implementation mode with safety gates.
-- `code-reviewer` — read-only review mode focused on actionable findings.
-- `researcher` — evidence-first research mode with uncertainty handling.
+> What should the agent be allowed to do, how strict should it be, and what safety checks should apply for this project?
 
 ## Install
 
@@ -48,54 +30,194 @@ Install from npm, after publishing:
 pi install npm:pi-harness-factory
 ```
 
-## Commands
+## Main menu
+
+Run:
 
 ```text
-/factory help
+/factory
+```
+
+The factory opens a menu:
+
+```text
+Use a harness
+Create a harness
+Current harness
+Manage harnesses
+```
+
+### Use a harness
+
+Opens an interactive card browser. Cards summarize each harness by functional behavior:
+
+- mode / role
+- allowed tools
+- validation strictness
+- mutation scope
+- safety level
+- confirmations
+- workflow rules
+
+You can also use direct commands:
+
+```text
+/factory browse
 /factory list
-/factory create
-/factory create coder
-/factory preview <profile-id>
-/factory preview
+/factory pick <profile-id>
 /factory use <profile-id>
-/factory use
-/factory switch <profile-id>
-/factory <profile-id>
-/factory active
 ```
 
-`/facory` is also registered as a typo alias for `/factory`.
+### Create a harness
 
-Example:
+Creates a project-local harness with a guided flow:
+
+1. Choose role
+   - Coder
+   - Reviewer
+   - Researcher
+   - DevOps
+   - PM / Writer
+   - Custom
+2. Choose role preset
+   - Safe implementation
+   - Strict TDD
+   - Read-only review
+   - Evidence researcher
+   - Release operator
+3. Customize harnessing axes
+   - mutation scope
+   - validation strictness
+   - safety gates
+   - autonomy
+   - output style
+4. Preview compiled rules
+5. Save only or Save & Activate
+
+Generated profiles are saved under:
 
 ```text
-/factory list
-/factory create coder
-/factory safe-coder
-/factory use safe-coder
-/factory switch safe-coder
+.pi/harness-factory/profiles/<profile-id>.json
 ```
 
-`/factory create coder` asks Coder-specific questions:
+### Current harness
 
-- coding style strictness
-- TDD policy
-- change scope
-- validation policy
-- optional additional rules
+Shows the active harness and the rules currently affecting Pi:
 
-It previews the generated profile before saving, including recommended packages and install commands.
-
-For Coder, the first recommended packages are:
-
-- `pi-lens` for code diagnostics and LSP/lint feedback.
-- `context-mode` for large test/build/log output processing.
-- `pi-ask-user` for structured clarification questions.
+- persona / role summary
+- allowed and blocked tools
+- guards
+- workflow flags
+- policies
+- recommended packages
+- memory rules injected into the system prompt
 
 The active project profile is stored at:
 
 ```text
 .pi/harness-factory/active.json
+```
+
+### Manage harnesses
+
+Provides project-local profile management:
+
+- Duplicate harness
+  - Copy a preset or existing harness into `.pi/harness-factory/profiles/`.
+  - Useful before editing bundled presets.
+- Edit project harness
+  - Modify project-local mutation scope, validation strictness, safety gates, autonomy, and output style.
+- Delete project harness
+  - Deletes project-local profiles only.
+  - Bundled presets cannot be deleted.
+- Import / Export
+  - Export a harness profile to JSON.
+  - Import a harness JSON into the current project after validation and confirmation.
+
+## Built-in presets
+
+- `safe-coder` — cautious everyday implementation mode with safety gates.
+- `code-reviewer` — read-only review mode focused on actionable findings.
+- `researcher` — evidence-first research mode with uncertainty handling.
+
+## Harnessing axes
+
+Generated and edited profiles are built from functional axes.
+
+### Mutation scope
+
+```text
+Read-only
+Artifacts only
+Minimal edits
+Focused refactors
+Broad refactors
+```
+
+### Validation strictness
+
+```text
+Manual
+After edits
+Always
+Test-first
+Release-grade
+```
+
+### Safety gates
+
+```text
+Lightweight
+Balanced
+Strict
+Read-only
+Release-safe
+```
+
+### Autonomy
+
+```text
+Ask first
+Plan then act
+Act within scope
+Autonomous
+Review-gated
+```
+
+### Output style
+
+```text
+Concise summary
+Detailed rationale
+Findings table
+Artifact-first
+```
+
+These choices compile into the profile fields Pi uses at runtime:
+
+- `tools.allowed`
+- `tools.blocked`
+- `tools.readOnly`
+- `guards`
+- `workflow`
+- `policies`
+- `capabilities`
+- `memory`
+
+## Commands
+
+```text
+/factory
+/factory help
+/factory browse
+/factory list
+/factory pick <profile-id>
+/factory create
+/factory active
+/factory preview <profile-id>
+/factory use <profile-id>
+/factory switch <profile-id>
+/factory manage
 ```
 
 ## What the MVP enforces
@@ -104,13 +226,20 @@ The active project profile is stored at:
 - Enforces read-only mode for `write` and `edit` when enabled.
 - Asks before sensitive file access, such as `.env`, private keys, credentials, or secrets.
 - Asks before dangerous shell commands, such as recursive delete, `sudo`, force push, or `chmod 777`.
+- Asks before `git push` when the active profile requires it.
 - Shows the active harness label in the Pi status area.
+- Injects active harness instructions into the agent system prompt.
 - Records recommended packages, allowed packages, and capability bindings in generated profiles.
 
-## Roadmap
+## Safety model
 
-- `/factory clone`, `/factory edit`, `/factory delete`.
-- Project-local generated extension files.
-- Import/export `.harness.json` bundles.
-- Preset marketplace/catalog support.
-- Optional integration with package managers such as `pi-depo`.
+This package is a Pi extension and prompt/tool-policy layer, not an OS sandbox. It is designed to make Pi sessions more consistent by combining generated instructions with extension hooks. It cannot control commands run outside Pi or tools that bypass Pi's extension hooks.
+
+## Development
+
+Run validation:
+
+```bash
+npm test
+npm pack --dry-run
+```
