@@ -9,15 +9,13 @@ import registerHarnessFactory, {
 	renderHarnessGallery,
 } from "../.tmp-test/extensions/index.js";
 
-const strictProfile = JSON.parse(
-	readFileSync(".pi/harness-factory/profiles/strict-coder.json", "utf8"),
-);
+const tddProfile = JSON.parse(readFileSync("presets/tdd.json", "utf8"));
 
-const card = renderHarnessCard(strictProfile, { active: true });
-assert.match(card, /┌─ \* .*strict coder/);
+const card = renderHarnessCard(tddProfile, { active: true });
+assert.match(card, /┌─ \* .*TDD/);
 assert.match(card, /Best for:/);
 assert.match(card, /Safety:/);
-assert.match(card, /Use: \/factory pick strict-coder/);
+assert.match(card, /Use: \/factory pick tdd/);
 
 const reviewerProfile = JSON.parse(
 	readFileSync("presets/code-reviewer.json", "utf8"),
@@ -33,39 +31,39 @@ assert.match(
 	/Best for: evidence gathering/,
 );
 
-const gallery = renderHarnessGallery([strictProfile], "strict-coder");
+const gallery = renderHarnessGallery([tddProfile], "tdd");
 assert.match(gallery, /Harness cards/);
-assert.match(gallery, /strict coder/);
+assert.match(gallery, /TDD/);
 
-const instructions = buildHarnessInstructions(strictProfile);
+const instructions = buildHarnessInstructions(tddProfile);
 assert.match(instructions, /Active Pi Harness Profile/);
-assert.match(instructions, /strict coder \(strict-coder\)/);
+assert.match(instructions, /TDD \(tdd\)/);
 assert.match(instructions, /Before using write\/edit/);
 assert.match(
 	instructions,
 	/run the most relevant available validation commands/,
 );
 assert.match(instructions, /Finish implementation work with a concise summary/);
-assert.match(instructions, /rm rf 자동 사용 금지/);
+assert.match(instructions, /Strict TDD/);
 
 assert.equal(isSensitivePath(".env"), true);
 assert.equal(isSensitivePath("config/credentials.json"), true);
 assert.equal(isSensitivePath("src/index.ts"), false);
 
 assert.equal(
-	commandRequiresConfirmation("rm -rf tmp", strictProfile.guards),
+	commandRequiresConfirmation("rm -rf tmp", tddProfile.guards),
 	"recursive delete",
 );
 assert.equal(
-	commandRequiresConfirmation("git push origin main", strictProfile.guards),
+	commandRequiresConfirmation("git push origin main", tddProfile.guards),
 	"git push",
 );
 assert.equal(
-	commandRequiresConfirmation("rm tmp.txt", strictProfile.guards),
+	commandRequiresConfirmation("rm tmp.txt", tddProfile.guards),
 	"delete command",
 );
 assert.equal(
-	commandRequiresConfirmation("npm test", strictProfile.guards),
+	commandRequiresConfirmation("npm test", tddProfile.guards),
 	null,
 );
 
@@ -148,7 +146,7 @@ await runtime.commands.get("factory").handler("", runtime.ctx);
 assert.equal(runtime.selects.at(-1).title, "Harness Factory");
 assert.match(
 	runtime.notifications.at(-1).message,
-	/strict coder|No active harness profile/,
+	/TDD|strict coder|No active harness profile/,
 );
 
 runtime.selectResponses.push("Use a harness");
@@ -170,7 +168,7 @@ const safeCopyId = safeCopyName
 runtime.selectResponses.push(
 	"Manage harnesses",
 	"Duplicate harness",
-	"strict-coder",
+	"tdd",
 	"Save only",
 );
 runtime.inputResponses.push(safeCopyName);
@@ -272,21 +270,21 @@ assert.equal(runtime.selects.at(-7).title, "Coder harness preset");
 assert.equal(runtime.selects.at(-1).title, "Save generated harness?");
 assert.match(runtime.notifications.at(-1).message, /Created harness profile/);
 
-runtime.selectResponses.push("strict-coder", "Preview full policy");
+runtime.selectResponses.push("tdd", "Preview full policy");
 await runtime.commands.get("factory").handler("pick", runtime.ctx);
 assert.equal(runtime.selects.at(-2).title, "Pick a harness");
-assert.equal(runtime.selects.at(-1).title, "strict coder selected");
+assert.equal(runtime.selects.at(-1).title, "TDD selected");
 assert.match(runtime.notifications.at(-1).message, /Persona:/);
 
-runtime.selectResponses.push("strict-coder", "Activate");
+runtime.selectResponses.push("tdd", "Activate");
 await runtime.commands.get("factory").handler("pick", runtime.ctx);
 assert.deepEqual(runtime.statuses.at(-1), {
 	key: "harness-factory",
-	value: "STRICT-CODER",
+	value: "TDD",
 });
 assert.match(
 	runtime.notifications.at(-1).message,
-	/Activated harness: strict coder/,
+	/Activated harness: TDD/,
 );
 
 await runtime.commands.get("factory").handler("demo-wizard", runtime.ctx);
@@ -303,21 +301,21 @@ assert.match(
 	/Harness Factory · Select a harness/,
 );
 
-await runtime.commands.get("factory").handler("use strict-coder", runtime.ctx);
+await runtime.commands.get("factory").handler("use tdd", runtime.ctx);
 assert.deepEqual(runtime.statuses.at(-1), {
 	key: "harness-factory",
-	value: "STRICT-CODER",
+	value: "TDD",
 });
 assert.match(
 	runtime.notifications.at(-1).message,
-	/Activated harness: strict coder/,
+	/Activated harness: TDD/,
 );
 
 const promptPatch = await runtime.hooks.get("before_agent_start")({
 	systemPrompt: "Base prompt",
 });
 assert.match(promptPatch.systemPrompt, /Base prompt/);
-assert.match(promptPatch.systemPrompt, /strict coder \(strict-coder\)/);
+assert.match(promptPatch.systemPrompt, /TDD \(tdd\)/);
 
 const blockedDelete = await runtime.hooks.get("tool_call")(
 	{ toolName: "bash", input: { command: "git push origin main" } },

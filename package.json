@@ -4,13 +4,13 @@
   "description": "Create, switch, and manage persona-based harness profiles for Pi Coding Agent.",
   "type": "module",
   "author": "Sungwon Kim",
-  "homepage": "https://github.com/sungwon-kim/pi-harness-factory#readme",
+  "homepage": "https://github.com/kswift1/pi-harness-factory#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sungwon-kim/pi-harness-factory.git"
+    "url": "git+https://github.com/kswift1/pi-harness-factory.git"
   },
   "bugs": {
-    "url": "https://github.com/sungwon-kim/pi-harness-factory/issues"
+    "url": "https://github.com/kswift1/pi-harness-factory/issues"
   },
   "keywords": [
     "pi-package",
@@ -33,7 +33,7 @@
     "./templates/*.json": "./templates/*.json"
   },
   "scripts": {
-    "test": "node -e \"require('node:fs').rmSync('.tmp-test', { recursive: true, force: true })\" && tsc --rootDir . --outDir .tmp-test && node tests/harness-factory.test.mjs"
+    "test": "node -e \"const fs=require('node:fs'); fs.rmSync('.tmp-test', { recursive: true, force: true }); fs.mkdirSync('.tmp-test/presets', { recursive: true }); fs.cpSync('presets', '.tmp-test/presets', { recursive: true })\" && tsc --rootDir . --outDir .tmp-test && node tests/harness-factory.test.mjs"
   },
   "pi": {
     "extensions": [

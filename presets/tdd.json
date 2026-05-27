@@ -1,0 +1,62 @@
+{
+  "id": "tdd",
+  "displayName": "TDD",
+  "type": "coder",
+  "description": "Strict test-first coding harness with planning, full validation, and strong safety gates.",
+  "persona": "Coder harness compiled from functional constraints: Broad refactors, Always, Strict, Plan then act.",
+  "policies": {
+    "role": "Coder",
+    "preset": "Strict TDD — test-first, strict structure, full validation",
+    "mutationScope": "Broad refactors",
+    "validationStrictness": "Always",
+    "safetyLevel": "Strict",
+    "autonomy": "Plan then act",
+    "outputStyle": "Concise summary"
+  },
+  "packages": {
+    "recommended": ["pi-lens", "context-mode", "pi-ask-user"],
+    "allowed": ["pi-lens", "context-mode", "pi-ask-user"],
+    "installCommands": [
+      "pi install npm:pi-lens",
+      "pi install npm:context-mode",
+      "pi install npm:pi-ask-user"
+    ]
+  },
+  "capabilities": {
+    "codeDiagnostics": { "enabled": true, "provider": "pi-lens" },
+    "largeOutputProcessing": { "enabled": true, "provider": "context-mode" },
+    "structuredClarification": { "enabled": true, "provider": "pi-ask-user" },
+    "webResearch": { "enabled": false, "provider": "pi-web-access" },
+    "subagents": { "enabled": false, "provider": "pi-subagents" }
+  },
+  "tools": {
+    "allowed": ["read", "write", "edit", "bash"],
+    "blocked": [],
+    "readOnly": false
+  },
+  "guards": {
+    "confirmDangerousCommands": true,
+    "blockSecrets": true,
+    "protectEnvFiles": true,
+    "confirmGitPush": true,
+    "confirmDeletes": true
+  },
+  "workflow": {
+    "requirePlanBeforeEdit": true,
+    "runTestsAfterEdit": true,
+    "summarizeChanges": true
+  },
+  "ui": {
+    "statusLabel": "TDD",
+    "themeHint": "green"
+  },
+  "memory": [
+    "Role: Coder.",
+    "Role preset: Strict TDD — test-first, strict structure, full validation.",
+    "Mutation scope: Broad refactors.",
+    "Validation strictness: Always.",
+    "Safety level: Strict.",
+    "Autonomy: Plan then act.",
+    "Output style: Concise summary."
+  ]
+}

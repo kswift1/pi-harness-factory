@@ -21,7 +21,7 @@ pi -e ./
 Install from GitHub:
 
 ```bash
-pi install git:github.com/sungwon-kim/pi-harness-factory
+pi install git:github.com/kswift1/pi-harness-factory
 ```
 
 Install from npm, after publishing:
@@ -136,6 +136,7 @@ Provides project-local profile management:
 
 ## Built-in presets
 
+- `tdd` — strict test-first coding mode with planning, full validation, and safety gates.
 - `safe-coder` — cautious everyday implementation mode with safety gates.
 - `code-reviewer` — read-only review mode focused on actionable findings.
 - `researcher` — evidence-first research mode with uncertainty handling.
