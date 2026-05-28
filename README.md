@@ -24,11 +24,29 @@ Install from GitHub:
 pi install git:github.com/kswift1/pi-harness-factory
 ```
 
-Install from npm, after publishing:
+Install from npm:
 
 ```bash
 pi install npm:pi-harness-factory
 ```
+
+## Quick start
+
+Install the package, then restart Pi or run `/reload` in an existing Pi session so the `/factory` command is registered:
+
+```bash
+pi install npm:pi-harness-factory
+```
+
+Then run inside Pi:
+
+```text
+/factory
+/factory list
+/factory use tdd
+```
+
+With the bundled `tdd` profile active, Pi receives a strict coder harness: broad refactor scope, `Always` validation strictness, `Strict` safety gates, and `Plan then act` autonomy. In practice it plans before edits, validates after edits, summarizes changes, and asks before secret access, dangerous commands, deletes, or git push.
 
 ## Main menu
 
@@ -136,7 +154,7 @@ Provides project-local profile management:
 
 ## Built-in presets
 
-- `tdd` — strict test-first coding mode with planning, full validation, and safety gates.
+- `tdd` — strict coder profile with preset `Strict TDD — test-first, strict structure, full validation`, broad refactor scope, `Always` validation strictness, strict safety gates, and plan-then-act workflow.
 - `safe-coder` — cautious everyday implementation mode with safety gates.
 - `code-reviewer` — read-only review mode focused on actionable findings.
 - `researcher` — evidence-first research mode with uncertainty handling.
